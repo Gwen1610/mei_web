@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mei</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --fg: rgba(255,255,255,0.92);
+    --fg-soft: rgba(255,255,255,0.45);
+    --sidebar-w: 220px;
+    --gap: 28px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+
+  body {
+    min-height: 100%;
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif;
+    /* Fixed background that persists behind everything */
+    background-image: url('bg.JPG');
+    background-size: cover;
+    background-position: center center;
+    background-attachment: fixed;
+  }
+
+  /* ── SIDEBAR: floating text only, no background ── */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 36px 24px 32px 20px;
+    z-index: 100;
+    pointer-events: auto;
+  }
+
+  .sidebar-top {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .s-name {
+    font-size: 32px;
+    font-weight: 300;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .s-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 20px;
+  }
+
+  .s-nav a {
+    font-size: 24px;
+    font-weight: 300;
+    color: var(--fg);
+    text-decoration: none;
+    line-height: 1.3;
+    transition: opacity 0.15s;
+  }
+  .s-nav a:hover { opacity: 0.5; }
+
+  .s-icons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .s-icon-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg);
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .s-icon-link:hover { opacity: 0.5; }
+  .s-icon-link svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .sidebar-bottom {
+    pointer-events: none;
+  }
+
+  .s-desc {
+    font-size: 11px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.01em;
+  }
+
+  /* ── MAIN AREA: offset to right 1/3 of page ── */
+  .main {
+    position: relative;
+    margin-left: calc(var(--sidebar-w) + 12vw);
+    margin-right: 4vw;
+    min-height: 100vh;
+    z-index: 1;
+  }
+
+  /* Hero spacer — shows bg, peeks first row */
+  .hero-spacer {
+    height: calc(100vh - var(--peek-h, 80px));
+    position: relative;
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 40px;
+    right: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: rgba(255,255,255,0.4);
+    animation: hintPulse 2.4s ease-in-out infinite;
+  }
+  .scroll-hint svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.5;
+  }
+
+  @keyframes hintPulse {
+    0%, 100% { opacity: 0.35; transform: translateY(0); }
+    50% { opacity: 0.7; transform: translateY(4px); }
+  }
+
+  /* ── PHOTO GRID ── */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap);
+    padding: 0 0 4vw 0;
+  }
+
+  .grid-spacer {
+    /* invisible first cell for offset */
+  }
+
+  .photo-cell {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .photo-cell.span-2 {
+    grid-column: span 2;
+    aspect-ratio: 3 / 2;
+  }
+
+  /* All photos: scale to fit, align top-left */
+  .photo-cell img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: left top;
+    display: block;
+    opacity: 0;
+    transform: scale(1.02);
+    transition: opacity 0.5s ease, transform 0.6s ease;
+  }
+
+  /* Fade-in + gentle rise */
+  .photo-cell {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+
+  .photo-cell.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .photo-cell img.loaded {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .photo-cell:hover img.loaded {
+    transform: scale(1.025);
+  }
+
+  /* ── LIGHTBOX ── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: rgba(8,6,4,0.96);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .lightbox.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .lb-wrap {
+    max-width: calc(100vw - 160px);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lb-wrap img {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.3s;
+    display: block;
+  }
+  .lb-wrap img.loaded { opacity: 1; }
+
+  .lb-close {
+    position: fixed;
+    top: 20px; right: 24px;
+    background: none; border: none;
+    color: rgba(200,195,185,0.35);
+    font-size: 20px; font-weight: 300;
+    cursor: pointer;
+    transition: color 0.15s;
+    line-height: 1; padding: 8px;
+    font-family: inherit;
+  }
+  .lb-close:hover { color: rgba(200,195,185,0.85); }
+
+  .lb-arrow {
+    position: fixed;
+    top: 50%; transform: translateY(-50%);
+    background: none; border: none;
+    color: rgba(200,195,185,0.25);
+    font-size: 32px; font-weight: 200;
+    cursor: pointer;
+    padding: 20px 14px;
+    transition: color 0.15s;
+    line-height: 1;
+    font-family: inherit;
+  }
+  .lb-arrow:hover { color: rgba(200,195,185,0.8); }
+  .lb-arrow.prev { left: 20px; }
+  .lb-arrow.next { right: 12px; }
+
+  .lb-meta {
+    margin-top: 14px;
+    color: rgba(200,195,185,0.4);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-align: center;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .lb-meta span {
+    white-space: nowrap;
+  }
+
+  .lb-meta .lb-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(200,195,185,0.25);
+    flex-shrink: 0;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    :root { --sidebar-w: 180px; --gap: 16px; }
+    .main { margin-left: var(--sidebar-w); margin-right: 2vw; }
+    .s-name { font-size: 22px; }
+    .s-nav a { font-size: 18px; }
+    .photo-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 520px) {
+    :root { --sidebar-w: 0px; --gap: 12px; }
+    .sidebar { display: none; }
+    .main { margin-left: 3vw; margin-right: 3vw; }
+    .photo-grid { grid-template-columns: repeat(2, 1fr); }
+    .lb-wrap { max-width: calc(100vw - 40px); margin-left: 0; }
+    .lb-arrow.prev { left: 4px; }
+    .lb-counter { transform: translateX(-50%); }
+  }
+</style>
+</head>
+<body>
+
+<!-- sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-top">
+    <div class="s-name">Mei</div>
+    <nav class="s-nav">
+      <a href="#">Photography</a>
+      <a href="#">Archive</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="s-icons">
+      <!-- xiaohongshu -->
+      <a class="s-icon-link" href="#" aria-label="Xiaohongshu">
+        <span style="font-size:20px;line-height:1;">🍠</span>
+      </a>
+      <!-- instagram -->
+      <a class="s-icon-link" href="#" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+        </svg>
+      </a>
+      <!-- mail -->
+      <a class="s-icon-link" href="#" aria-label="Email">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+  <div class="sidebar-bottom">
+    <p class="s-desc">
+      All content copyright the artist.<br>
+      No commercial use without<br>
+      express written permission.
+    </p>
+  </div>
+</aside>
+
+<!-- main content -->
+<main class="main">
+  <div class="hero-spacer">
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+  </div>
+  <div class="photo-grid" id="grid"></div>
+</main>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox">
+  <div class="lb-wrap" id="lb-wrap"></div>
+  <button class="lb-close" id="lb-close">&times;</button>
+  <button class="lb-arrow prev" id="lb-prev">&lsaquo;</button>
+  <button class="lb-arrow next" id="lb-next">&rsaquo;</button>
+</div>
+
+<script>
+let PHOTOS = [];
+
+// ── Load photos from JSON built by build.py ──
+fetch('photos.json')
+  .then(r => r.json())
+  .then(data => {
+    PHOTOS = data;
+    PHOTOS.forEach(p => {
+      const ratio = p.w / p.h;
+      if (ratio > 1.6) p.orient = 'wide';
+      else if (ratio > 1.15) p.orient = 'landscape';
+      else if (ratio < 0.85) p.orient = 'portrait';
+      else p.orient = 'square';
+    });
+    buildGrid();
+    calcPeek();
+  });
+
+// ── Calculate peek height ──
+function calcPeek() {
+  const sw = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 220;
+  const gap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 28;
+  const extraLeft = window.innerWidth * 0.12;
+  const extraRight = window.innerWidth * 0.04;
+  const gridW = window.innerWidth - sw - extraLeft - extraRight;
+  const cellW = (gridW - gap * 2) / 3;
+  const cellH = cellW * (4 / 3);
+  document.documentElement.style.setProperty('--peek-h', Math.round(cellH * 0.2) + 'px');
+}
+window.addEventListener('resize', calcPeek);
+
+// ── Build grid ──
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  if (PHOTOS.length === 0) return;
+
+  const first = PHOTOS[0];
+  let startIdx = 0;
+
+  if (first.orient === 'wide') {
+    const spacer = document.createElement('div');
+    spacer.className = 'grid-spacer';
+    grid.appendChild(spacer);
+    grid.appendChild(createCell(first, 0));
+    startIdx = 1;
+  } else {
+    const spacer = document.createElement('div');
+    spacer.className = 'grid-spacer';
+    grid.appendChild(spacer);
+    startIdx = 0;
+  }
+
+  for (let i = startIdx; i < PHOTOS.length; i++) {
+    grid.appendChild(createCell(PHOTOS[i], i));
+  }
+}
+
+function createCell(photo, index) {
+  const cell = document.createElement('div');
+  cell.className = 'photo-cell';
+
+  if (photo.orient === 'wide') {
+    cell.classList.add('span-2');
+  }
+
+  cell.dataset.index = index;
+  cell.addEventListener('click', () => openLightbox(index));
+
+  const imgObserver = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) {
+      const img = document.createElement('img');
+      img.src = photo.src;
+      img.alt = '';
+      img.onload = () => img.classList.add('loaded');
+      cell.appendChild(img);
+      imgObserver.disconnect();
+    }
+  }, { rootMargin: '300px' });
+  imgObserver.observe(cell);
+
+  const fadeObserver = new IntersectionObserver(entries => {
+    const entry = entries[0];
+    if (entry.isIntersecting) {
+      cell.classList.add('in-view');
+    } else if (entry.boundingClientRect.top > 0) {
+      cell.classList.remove('in-view');
+    }
+  }, { threshold: 0.05 });
+  fadeObserver.observe(cell);
+
+  return cell;
+}
+
+// ── Lightbox ──
+const lightbox = document.getElementById('lightbox');
+const lbWrap = document.getElementById('lb-wrap');
+let currentIdx = -1;
+
+function openLightbox(idx) {
+  currentIdx = idx;
+  renderLightbox();
+  lightbox.classList.add('open');
+}
+
+function closeLightbox() {
+  lightbox.classList.remove('open');
+  currentIdx = -1;
+}
+
+function renderLightbox() {
+  const photo = PHOTOS[currentIdx];
+  lbWrap.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = photo.src;
+  img.onload = () => img.classList.add('loaded');
+  lbWrap.appendChild(img);
+
+  const meta = document.createElement('div');
+  meta.className = 'lb-meta';
+  meta.innerHTML = `
+    <span>${photo.date}</span>
+    <div class="lb-dot"></div>
+    <span>${photo.location}</span>
+    <div class="lb-dot"></div>
+    <span>${photo.device}</span>
+  `;
+  lbWrap.appendChild(meta);
+}
+
+document.getElementById('lb-close').addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', e => {
+  if (e.target === lightbox) closeLightbox();
+});
+
+document.getElementById('lb-prev').addEventListener('click', e => {
+  e.stopPropagation();
+  currentIdx = (currentIdx - 1 + PHOTOS.length) % PHOTOS.length;
+  renderLightbox();
+});
+
+document.getElementById('lb-next').addEventListener('click', e => {
+  e.stopPropagation();
+  currentIdx = (currentIdx + 1) % PHOTOS.length;
+  renderLightbox();
+});
+
+document.addEventListener('keydown', e => {
+  if (currentIdx < 0) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') {
+    currentIdx = (currentIdx - 1 + PHOTOS.length) % PHOTOS.length;
+    renderLightbox();
+  }
+  if (e.key === 'ArrowRight') {
+    currentIdx = (currentIdx + 1) % PHOTOS.length;
+    renderLightbox();
+  }
+});
+</script>
+</body>
+</html>
